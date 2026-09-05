@@ -18,6 +18,15 @@ class PPEDetectionRequest(BaseModel):
     media_reference: Optional[str] = None
 
 
+class PPEWorkflow(BaseModel):
+    risk_event_id: Optional[int] = None
+    violation_id: Optional[int] = None
+    alert_id: Optional[int] = None
+    capa_id: Optional[int] = None
+    contractor_id: Optional[int] = None
+    status: str
+
+
 class PPEDetectionResponse(BaseModel):
     event_id: int
     mode: str
@@ -30,3 +39,4 @@ class PPEDetectionResponse(BaseModel):
     camera: str
     created_at: datetime
     disclaimer: str
+    workflow: Optional["PPEWorkflow"] = None

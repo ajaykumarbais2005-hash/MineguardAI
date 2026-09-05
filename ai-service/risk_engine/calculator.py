@@ -5,6 +5,10 @@ from dataclasses import dataclass
 class RiskResult:
     score: float
     level: str
+    severity: float
+    likelihood: float
+    exposure: float
+    recurrence: float
     reason: str
     recommended_action: str
 
@@ -18,4 +22,4 @@ def calculate_risk(severity: float, likelihood: float, exposure: float, recurren
     level = "LOW" if score <= 25 else "MEDIUM" if score <= 50 else "HIGH" if score <= 75 else "CRITICAL"
     reason = f"Score reflects severity {severity}, likelihood {likelihood}, exposure {exposure}, and recurrence {recurrence}."
     actions = {"LOW": "Continue routine controls and scheduled monitoring.", "MEDIUM": "Review controls and increase monitoring frequency.", "HIGH": "Assign immediate corrective action and verify controls.", "CRITICAL": "Stop affected work, escalate, and verify controls before restart."}
-    return RiskResult(score, level, reason, actions[level])
+    return RiskResult(score, level, severity, likelihood, exposure, recurrence, reason, actions[level])

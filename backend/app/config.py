@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 60
     upload_directory: str = "data/uploads"
     ai_service_url: str = "http://localhost:8001"
-    cors_origins: str = "http://localhost:5173"
+    cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
     ai_mode: str = "DEMO_SIMULATION"
     ocr_mode: str = "DEMO"
 

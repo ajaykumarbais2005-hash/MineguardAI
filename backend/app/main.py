@@ -13,6 +13,13 @@ from app.routers.health import router as health_router
 from app.routers.inspections import router as inspections_router
 from app.routers.violations import router as violations_router
 from app.routers.mines import router as mines_router
+from app.routers.risk import router as risk_router
+from app.routers.anomaly import router as anomaly_router
+from app.routers.documents import router as documents_router
+from app.routers.gis import router as gis_router
+from app.routers.iot import router as iot_router
+from app.routers.reports import router as reports_router
+from app.routers.workflow import router as workflow_router
 
 settings = get_settings()
 app = FastAPI(
@@ -39,3 +46,10 @@ app.include_router(ai_router)
 app.include_router(inspections_router)
 app.include_router(violations_router)
 app.include_router(mines_router)
+app.include_router(risk_router)
+app.include_router(anomaly_router)
+app.include_router(documents_router)
+app.include_router(gis_router)
+app.include_router(iot_router)
+app.include_router(reports_router)
+app.include_router(workflow_router)

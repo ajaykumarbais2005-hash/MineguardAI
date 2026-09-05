@@ -1,5 +1,5 @@
 import './App.css'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { Activity, AlertTriangle, BarChart3, Bell, CheckCircle2, ClipboardCheck, ClipboardList, FileSearch, FileText, HardHat, LayoutDashboard, Map, Menu, Mountain, Settings, ShieldCheck, Users, X } from 'lucide-react'
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
@@ -12,7 +12,13 @@ import CorrectiveActionsPage from './pages/CorrectiveActionsPage'
 import ContractorsPage from './pages/ContractorsPage'
 import AlertsPage from './pages/AlertsPage'
 import AuditTrailPage from './pages/AuditTrailPage'
-import AIMonitoringPage from './pages/AIMonitoringPage'
+import AIMonitoringPage from './pages/AIMonitoringPageSelectable'
+import RiskAnalyticsPage from './pages/RiskAnalyticsPage'
+import DocumentsPage from './pages/DocumentsPage'
+import GISMapPage from './pages/GISMapPage'
+import IoTMonitoringPage from './pages/IoTMonitoringPage'
+import ReportsPage from './pages/ReportsPage'
+import { getWorkflowSummary, type WorkflowSummary } from './services/api'
 
 type NavigationItem = {
   label: string
@@ -66,7 +72,10 @@ function App() {
   const { user, logout } = useAuth()
   const location = useLocation()
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+  const [workflowSummary, setWorkflowSummary] = useState<WorkflowSummary | null>(null)
   const visibleNavigation = navigationItems.filter((item) => !item.roles || item.roles.includes(user?.role ?? ''))
+
+  useEffect(() => { void getWorkflowSummary().then(setWorkflowSummary).catch(() => setWorkflowSummary(null)) }, [])
 
   return (
     <main className="app-shell">
@@ -108,7 +117,7 @@ function App() {
         </header>
 
         <div className="content-grid dashboard-content">
-          {location.pathname === '/mines' ? <MinesPage /> : location.pathname === '/compliance' ? <CompliancePage /> : location.pathname === '/inspections' ? <InspectionsPage /> : location.pathname === '/violations' ? <ViolationsPage /> : location.pathname === '/corrective-actions' ? <CorrectiveActionsPage /> : location.pathname === '/contractors' ? <ContractorsPage /> : location.pathname === '/alerts' ? <AlertsPage /> : location.pathname === '/audit-trail' ? <AuditTrailPage /> : location.pathname === '/ai-monitoring' ? <AIMonitoringPage /> : <>
+          {location.pathname === '/mines' ? <MinesPage /> : location.pathname === '/compliance' ? <CompliancePage /> : location.pathname === '/inspections' ? <InspectionsPage /> : location.pathname === '/violations' ? <ViolationsPage /> : location.pathname === '/corrective-actions' ? <CorrectiveActionsPage /> : location.pathname === '/contractors' ? <ContractorsPage /> : location.pathname === '/alerts' ? <AlertsPage /> : location.pathname === '/audit-trail' ? <AuditTrailPage /> : location.pathname === '/ai-monitoring' ? <AIMonitoringPage /> : location.pathname === '/risk-analytics' ? <RiskAnalyticsPage /> : location.pathname === '/documents' ? <DocumentsPage /> : location.pathname === '/gis-map' ? <GISMapPage /> : location.pathname === '/iot-monitoring' ? <IoTMonitoringPage /> : location.pathname === '/reports' ? <ReportsPage /> : <>
           <div className="dashboard-heading">
             <div><p className="eyebrow accent">Network command view</p><h2>Good morning, {user?.full_name.split(' ')[0]}.</h2><p>Operational signals across five monitored mine sites.</p></div>
             <div className="dashboard-filters"><span className="date-range">01 Sep - 04 Sep 2026</span><span className="live-chip"><span className="status-dot" />Live snapshot</span></div>
@@ -117,9 +126,9 @@ function App() {
           <div className="kpi-grid">
             <KpiCard label="Total mines" value="05" detail="4 active / 1 maintenance" icon={Mountain} tone="green" />
             <KpiCard label="Compliance rate" value="93.2%" detail="+2.1% vs last month" icon={ShieldCheck} tone="blue" />
-            <KpiCard label="Open violations" value="39" detail="3 critical / 7 high" icon={AlertTriangle} tone="red" />
+            <KpiCard label="Open violations" value={workflowSummary ? String(workflowSummary.open_violations) : "39"} detail={workflowSummary ? `${workflowSummary.unread_alerts} unread alerts` : "3 critical / 7 high"} icon={AlertTriangle} tone="red" />
             <KpiCard label="Safety risk score" value="38 / 100" detail="Medium network exposure" icon={BarChart3} tone="amber" />
-            <KpiCard label="AI safety events" value="34" detail="Last 7 days / demo mode" icon={HardHat} tone="orange" />
+            <KpiCard label="AI safety events" value={workflowSummary ? String(workflowSummary.ai_events) : "34"} detail={workflowSummary ? `${workflowSummary.risk_events} linked risk events` : "Last 7 days / demo mode"} icon={HardHat} tone="orange" />
             <KpiCard label="Inspection completion" value="87%" detail="96 of 110 planned" icon={ClipboardCheck} tone="teal" />
           </div>
 
@@ -148,7 +157,7 @@ function App() {
             <section className="dashboard-list-panel"><div className="list-heading"><div><p className="eyebrow">Attention queue</p><h3>Priority alerts</h3></div><NavLink to="/alerts">View all</NavLink></div><div className="alert-list"><div className="alert-row"><span className="alert-severity critical">CRITICAL</span><div><strong>Gas threshold approaching</strong><small>Gevra Central Block / Processing Area</small></div><time>08 min</time></div><div className="alert-row"><span className="alert-severity high">HIGH</span><div><strong>PPE violation detected</strong><small>Kusmunda North / Main Haul Road</small></div><time>18 min</time></div><div className="alert-row"><span className="alert-severity medium">MEDIUM</span><div><strong>Compliance verification overdue</strong><small>Raniganj Safety Pilot / Statutory review</small></div><time>42 min</time></div></div></section>
             <section className="dashboard-list-panel"><div className="list-heading"><div><p className="eyebrow">System log</p><h3>Recent activity</h3></div><NavLink to="/audit-trail">Audit trail</NavLink></div><div className="activity-list"><div><CheckCircle2 size={16} /><p><strong>Inspection submitted</strong><span>Daily transport safety / INS-2026-0001</span></p><time>12:14</time></div><div><HardHat size={16} /><p><strong>AI event linked</strong><span>No helmet event / CAM-HAUL-01</span></p><time>11:56</time></div><div><ClipboardList size={16} /><p><strong>CAPA assigned</strong><span>CAPA-2026-0001 to Bharat Mine Services</span></p><time>11:42</time></div></div></section>
           </div>
-          <p className="dashboard-disclaimer"><span className="status-dot" />Dashboard values are simulated demo data until live mine, sensor, and AI services are connected.</p>
+          <p className="dashboard-disclaimer"><span className="status-dot" />Workflow KPIs include live persisted AI, risk, violation, alert, and CAPA records; chart trends remain demo data.</p>
           </>}
         </div>
       </section>

@@ -68,7 +68,19 @@ export type AlertSummary = { unread: number; acknowledged: number; resolved: num
 export type AuditLog = { id: number; user_id: number | null; action: string; entity: string; entity_id: string | null; description: string; ip_address: string | null; created_at: string; user_name: string | null; user_email: string | null }
 export type AuditSummary = { total: number; today: number; creates: number; updates: number; deletes: number }
 export type PPEDetection = { label: string; confidence: number; present: boolean }
-export type PPEResult = { event_id: number; mode: string; event_type: string; severity: string; detections: PPEDetection[]; confidence: number; mine_id: number; zone_id: number | null; camera: string; created_at: string; disclaimer: string }
+export type PPEWorkflow = { risk_event_id: number | null; violation_id: number | null; alert_id: number | null; capa_id: number | null; contractor_id: number | null; status: string }
+export type PPEResult = { event_id: number; mode: string; event_type: string; severity: string; detections: PPEDetection[]; confidence: number; mine_id: number; zone_id: number | null; camera: string; created_at: string; disclaimer: string; workflow: PPEWorkflow | null }
+export type RiskEvent = { id: number; mine_id: number; zone_id: number | null; event_type: string; score: number; level: string; severity: number; likelihood: number; exposure: number; recurrence: number; reason: string; recommended_action: string; created_at: string; mine_name: string; zone_name: string | null }
+export type AnomalyResult = { id: number | null; mine_id: number; zone_id: number | null; metric: string; value: number; threshold: number; is_anomaly: boolean; severity: number; likelihood: number; exposure: number; recurrence: number; reason: string; risk_event_id: number | null; risk_score: number | null; risk_level: string | null; created_at: string; mode: string }
+export type OCRResult = { id: number; extracted_text: string; confidence: number; detected_fields: string | null; verification_status: string; processed_at: string }
+export type DocumentRecord = { id: number; file_name: string; document_type: string; file_path: string; mine_id: number | null; contractor_id: number | null; uploaded_by: number; uploaded_at: string; status: string; mine_name: string | null; contractor_name: string | null; ocr_result: OCRResult | null }
+export type GISPoint = { id: string; kind: string; label: string; latitude: number; longitude: number; mine_id: number; zone_id: number | null; status: string | null; risk_level: string | null; severity: string | null; demo_position: boolean }
+export type GISMapResponse = { points: GISPoint[]; mode: string }
+export type IoTReading = { id: number; sensor_id: number; value: number; recorded_at: string; is_anomaly: boolean }
+export type IoTSensor = { id: number; sensor_code: string; mine_id: number; zone_id: number | null; sensor_type: string; unit: string; threshold: number; status: string; last_reading: number | null; last_reading_at: string | null; mine_name: string; zone_name: string | null; readings: IoTReading[] }
+export type IoTSimulation = { sensors: IoTSensor[]; alerts_created: number; mode: string }
+export type ReportResponse = { report_type: string; mode: string; generated_at: string; rows: Array<Record<string, string | number | boolean | null>> }
+export type WorkflowSummary = { ai_events: number; risk_events: number; open_violations: number; unread_alerts: number; open_capa: number }
 
 export async function loginRequest(email: string, password: string) {
   const form = new URLSearchParams()
@@ -173,3 +185,16 @@ export async function updateAlert(id: number, status: string) { const response =
 export async function listAudit(params: { action?: string; entity?: string; search?: string } = {}) { const response = await api.get<AuditLog[]>('/audit', { params }); return response.data }
 export async function getAuditSummary() { const response = await api.get<AuditSummary>('/audit/summary'); return response.data }
 export async function runPPEDetection(payload: { mine_id: number; zone_id: number | null; camera: string; case: string }) { const response = await api.post<PPEResult>('/ai/ppe/detect', payload); return response.data }
+export async function listRiskEvents(params: { mine_id?: number; level?: string } = {}) { const response = await api.get<RiskEvent[]>('/risk', { params }); return response.data }
+export async function calculateRisk(payload: { mine_id: number; zone_id: number | null; event_type: string; severity: number; likelihood: number; exposure: number; recurrence: number }) { const response = await api.post<RiskEvent>('/risk/calculate', payload); return response.data }
+export async function detectAnomaly(payload: { mine_id: number; zone_id: number | null; metric: string; value: number }) { const response = await api.post<AnomalyResult>('/anomaly/detect', payload); return response.data }
+export async function listDocuments() { const response = await api.get<DocumentRecord[]>('/documents'); return response.data }
+export async function uploadDocument(file: File, documentType: string, mineId: number | null) { const form = new FormData(); form.append('file', file); form.append('document_type', documentType); if (mineId !== null) form.append('mine_id', String(mineId)); const response = await api.post<DocumentRecord>('/documents', form, { headers: { 'Content-Type': 'multipart/form-data' } }); return response.data }
+export async function verifyDocument(id: number, status: string) { const response = await api.patch<DocumentRecord>(`/documents/${id}/verification`, { status }); return response.data }
+export async function getGISMap() { const response = await api.get<GISMapResponse>('/gis/map'); return response.data }
+export async function listIoTSensors() { const response = await api.get<IoTSensor[]>('/iot'); return response.data }
+export async function simulateIoT(sensorId?: number) { const response = await api.post<IoTSimulation>('/iot/simulate', undefined, { params: sensorId ? { sensor_id: sensorId } : {} }); return response.data }
+export async function updateIoTThreshold(id: number, threshold: number) { const response = await api.patch<IoTSensor>(`/iot/${id}/threshold`, { threshold }); return response.data }
+export async function getReport(reportType: string, params: { mine_id?: number; date_from?: string; date_to?: string; severity?: string; status?: string; category?: string } = {}) { const response = await api.get<ReportResponse>(`/reports/${reportType}`, { params }); return response.data }
+export async function downloadReportCsv(reportType: string, params: { mine_id?: number; date_from?: string; date_to?: string; severity?: string; status?: string; category?: string } = {}) { const response = await api.get<Blob>(`/reports/${reportType}/csv`, { params, responseType: 'blob' }); return response.data }
+export async function getWorkflowSummary() { const response = await api.get<WorkflowSummary>('/workflow/summary'); return response.data }
