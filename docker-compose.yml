@@ -1,0 +1,18 @@
+services:
+  backend:
+    build: ./backend
+    environment:
+      DATABASE_URL: sqlite:///./mineguard.db
+      AI_MODE: DEMO_SIMULATION
+    ports:
+      - "8000:8000"
+  frontend:
+    build: ./frontend
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+  ai-service:
+    build: ./ai-service
+    ports:
+      - "8001:8001"

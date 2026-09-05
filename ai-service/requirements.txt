@@ -1,0 +1,3 @@
+# Phase 1: AI service boundary only. Install model dependencies when implementations are added.
+fastapi>=0.115,<1.0
+uvicorn[standard]>=0.34,<1.0
