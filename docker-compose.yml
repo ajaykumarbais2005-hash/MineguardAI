@@ -1,22 +1,64 @@
+name: mineguardai
+
 services:
   backend:
-    build: ./backend
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
     environment:
       ENVIRONMENT: ${ENVIRONMENT:-development}
-      DATABASE_URL: ${DATABASE_URL:-sqlite:///./mineguard.db}
+      DATABASE_URL: ${DATABASE_URL:-sqlite:////app/data/mineguard.db}
       JWT_SECRET: ${JWT_SECRET:-development-only-secret-change-me-32-bytes}
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
-      UPLOAD_DIRECTORY: ${UPLOAD_DIRECTORY:-data/uploads}
-      AI_MODE: DEMO_SIMULATION
-    ports:
-      - "8000:8000"
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-60}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}
+      UPLOAD_DIRECTORY: /app/data/uploads
+      AI_SERVICE_URL: ${AI_SERVICE_URL:-}
+      AI_MODE: ${AI_MODE:-DEMO_SIMULATION}
+      OCR_MODE: ${OCR_MODE:-DEMO}
+    volumes:
+      - mineguard-data:/app/data
+    expose:
+      - "8000"
+    read_only: true
+    tmpfs:
+      - /tmp:mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-/api}
     ports:
-      - "5173:5173"
+      - "127.0.0.1:${FRONTEND_PORT:-5173}:8080"
     depends_on:
-      - backend
-  ai-service:
-    build: ./ai-service
-    ports:
-      - "8001:8001"
+      backend:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /tmp:mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    restart: unless-stopped
+
+volumes:
+  mineguard-data:
+    name: mineguardai-data

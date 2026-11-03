@@ -18,7 +18,7 @@ Phase 1 provides the initial development foundation:
 
 The completed foundation includes database models, authentication/RBAC, the responsive operations shell, the dashboard, and the mine-management module. Later phases will add the remaining governance workflows, AI integrations, reporting, and audit views.
 
-The current dashboard presents network KPIs, compliance and risk trends, inspection completion, contractor compliance, AI safety events, simulated IoT readings, CAPA status, priority alerts, and recent activity. Dashboard values are explicitly marked as demo data until live services are connected.
+The dashboard presents API-derived operational KPIs, compliance and risk trends, inspections, alerts, and activity. Seeded development records and simulated AI/IoT values are identified as demo data.
 
 The Mine Management module is available at `/mines` after sign-in. It supports authenticated list/search/filter/sort, manager-restricted create/update/delete, detail statistics, operating zones, and safe deletion checks for related records.
 
@@ -54,7 +54,7 @@ The frontend runs at `http://localhost:5173`.
 
 ```powershell
 cd backend
-python -m pip install -r requirements.txt
+python -m pip install -r requirements-dev.txt
 python -m uvicorn app.main:app --reload --port 8000
 ```
 
@@ -65,6 +65,8 @@ Invoke-RestMethod http://localhost:8000/health
 ```
 
 The health response reports the configured environment, database boundary, AI mode, OCR mode, and timestamp.
+
+For a development login, initialize the database with `python -m app.init_db` and use `admin@mineguard.ai` with password `admin123`. This seeded account is for local development only; change or disable demo credentials before any shared or production deployment. Seeding is idempotent and does not reset passwords in an existing database.
 
 ### Database initialization
 
@@ -89,7 +91,7 @@ Important development defaults:
 
 ## Docker
 
-The root `docker-compose.yml` reserves services for the frontend, backend, and AI service. Container Dockerfiles and production deployment configuration will be completed in the Docker phase.
+Production-oriented Dockerfiles and Compose configuration are provided. See [DEPLOYMENT.md](./DEPLOYMENT.md) for environment setup, persistence, container commands, backups, and HTTPS deployment guidance.
 
 ## Testing
 

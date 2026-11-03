@@ -68,7 +68,7 @@ export default function AIMonitoringPageSelectable() {
   }
 
   return <div className="ai-management">
-    <div className="module-heading"><div><p className="eyebrow accent">Computer vision / Phase 15</p><h2>AI Monitoring</h2><p>Run a transparent PPE inspection using the configured simulation boundary.</p></div><span className="demo-chip">AI DEMO MODE</span></div>
+    <div className="module-heading"><div><h2>AI Monitoring</h2><p>Run a transparent PPE inspection using the configured simulation boundary.</p></div><span className="demo-chip">AI DEMO MODE</span></div>
     <div className="ai-control-panel">
       <div className="ai-camera"><Camera size={28} /><div><strong>{selectedMine?.mine_name ?? 'No mine selected'}</strong><span>{zones.find((zone) => zone.id === zoneId)?.name ?? 'Select an operating zone'}</span></div><span className="live-chip"><span className="status-dot" />Ready</span></div>
       <div className="ai-controls">

@@ -1,6 +1,6 @@
 import './App.css'
 import './design-system.css'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, NavLink, useLocation } from 'react-router-dom'
 import {
   Activity,
@@ -25,20 +25,6 @@ import {
 } from 'lucide-react'
 import { Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { useAuth } from './contexts/useAuth'
-import MinesPage from './pages/MinesPage'
-import CompliancePage from './pages/CompliancePage'
-import InspectionsPage from './pages/InspectionsPage'
-import ViolationsPage from './pages/ViolationsPage'
-import CorrectiveActionsPage from './pages/CorrectiveActionsPage'
-import ContractorsPage from './pages/ContractorsPage'
-import AlertsPage from './pages/AlertsPage'
-import AuditTrailPage from './pages/AuditTrailPage'
-import AIMonitoringPage from './pages/AIMonitoringPageSelectable'
-import RiskAnalyticsPage from './pages/RiskAnalyticsPage'
-import DocumentsPage from './pages/DocumentsPage'
-import GISMapPage from './pages/GISMapPage'
-import IoTMonitoringPage from './pages/IoTMonitoringPage'
-import ReportsPage from './pages/ReportsPage'
 import {
   getAlertSummary,
   getComplianceSummary,
@@ -56,10 +42,27 @@ import {
   type Violation,
 } from './services/api'
 
+const MinesPage = lazy(() => import('./pages/MinesPage'))
+const CompliancePage = lazy(() => import('./pages/CompliancePage'))
+const InspectionsPage = lazy(() => import('./pages/InspectionsPage'))
+const ViolationsPage = lazy(() => import('./pages/ViolationsPage'))
+const CorrectiveActionsPage = lazy(() => import('./pages/CorrectiveActionsPage'))
+const ContractorsPage = lazy(() => import('./pages/ContractorsPage'))
+const AlertsPage = lazy(() => import('./pages/AlertsPage'))
+const AuditTrailPage = lazy(() => import('./pages/AuditTrailPage'))
+const AIMonitoringPage = lazy(() => import('./pages/AIMonitoringPageSelectable'))
+const RiskAnalyticsPage = lazy(() => import('./pages/RiskAnalyticsPage'))
+const DocumentsPage = lazy(() => import('./pages/DocumentsPage'))
+const GISMapPage = lazy(() => import('./pages/GISMapPage'))
+const IoTMonitoringPage = lazy(() => import('./pages/IoTMonitoringPage'))
+const ReportsPage = lazy(() => import('./pages/ReportsPage'))
+const SettingsPage = lazy(() => import('./pages/SettingsPage'))
+
 type NavigationItem = {
   label: string
   path: string
   icon: LucideIcon
+  group: string
   roles?: string[]
 }
 
@@ -82,22 +85,22 @@ type ActivityItem = {
 }
 
 const navigationItems: NavigationItem[] = [
-  { label: 'Dashboard', path: '/', icon: LayoutDashboard },
-  { label: 'Mines', path: '/mines', icon: Mountain },
-  { label: 'Compliance', path: '/compliance', icon: ShieldCheck },
-  { label: 'Inspections', path: '/inspections', icon: ClipboardCheck },
-  { label: 'Violations', path: '/violations', icon: AlertTriangle },
-  { label: 'Corrective Actions', path: '/corrective-actions', icon: ClipboardList },
-  { label: 'Contractors', path: '/contractors', icon: Users },
-  { label: 'AI Monitoring', path: '/ai-monitoring', icon: HardHat },
-  { label: 'Risk Analytics', path: '/risk-analytics', icon: BarChart3 },
-  { label: 'GIS Map', path: '/gis-map', icon: Map },
-  { label: 'IoT Monitoring', path: '/iot-monitoring', icon: Activity },
-  { label: 'Documents / OCR', path: '/documents', icon: FileSearch },
-  { label: 'Alerts', path: '/alerts', icon: Bell },
-  { label: 'Reports', path: '/reports', icon: FileText },
-  { label: 'Audit Trail', path: '/audit-trail', icon: ClipboardList, roles: ['ADMIN', 'AUDITOR'] },
-  { label: 'Settings', path: '/settings', icon: Settings, roles: ['ADMIN', 'MINE_MANAGER'] },
+  { label: 'Dashboard', path: '/', icon: LayoutDashboard, group: 'Overview' },
+  { label: 'Mines', path: '/mines', icon: Mountain, group: 'Operations' },
+  { label: 'Compliance', path: '/compliance', icon: ShieldCheck, group: 'Operations' },
+  { label: 'Inspections', path: '/inspections', icon: ClipboardCheck, group: 'Operations' },
+  { label: 'Violations', path: '/violations', icon: AlertTriangle, group: 'Operations' },
+  { label: 'Corrective Actions', path: '/corrective-actions', icon: ClipboardList, group: 'Operations' },
+  { label: 'Contractors', path: '/contractors', icon: Users, group: 'Operations' },
+  { label: 'AI Monitoring', path: '/ai-monitoring', icon: HardHat, group: 'Monitoring' },
+  { label: 'Risk Analytics', path: '/risk-analytics', icon: BarChart3, group: 'Monitoring' },
+  { label: 'GIS Map', path: '/gis-map', icon: Map, group: 'Monitoring' },
+  { label: 'IoT Monitoring', path: '/iot-monitoring', icon: Activity, group: 'Monitoring' },
+  { label: 'Documents / OCR', path: '/documents', icon: FileSearch, group: 'Records' },
+  { label: 'Alerts', path: '/alerts', icon: Bell, group: 'Records' },
+  { label: 'Reports', path: '/reports', icon: FileText, group: 'Records' },
+  { label: 'Audit Trail', path: '/audit-trail', icon: ClipboardList, group: 'Administration', roles: ['ADMIN', 'AUDITOR'] },
+  { label: 'Settings', path: '/settings', icon: Settings, group: 'Administration', roles: ['ADMIN', 'MINE_MANAGER'] },
 ]
 
 const riskColors: Record<string, string> = {
@@ -233,7 +236,7 @@ function Dashboard({ data, isLoading, error, onRetry, firstName }: {
 
   return (
     <>
-      <div className="dashboard-heading">
+      <div className="dashboard-heading dashboard-hero">
         <div>
           <p className="eyebrow accent">Operational overview</p>
           <h2>Welcome back, {firstName}.</h2>
@@ -352,7 +355,6 @@ function App() {
   )
   const currentPage = navigationItems.find((item) => item.path === location.pathname)
   const isDashboard = location.pathname === '/'
-    || location.pathname === '/settings'
     || !navigationItems.some((item) => item.path === location.pathname)
 
   const loadDashboard = useCallback(async () => {
@@ -435,15 +437,22 @@ function App() {
           <button className="sidebar-close" type="button" aria-label="Close navigation" onClick={() => setIsSidebarOpen(false)}><X size={18} /></button>
         </div>
         <div className="sidebar-rule" />
-        <p className="nav-label">Workspace</p>
         <nav className="primary-navigation" aria-label="Primary navigation">
-          {visibleNavigation.map(({ label, path, icon: Icon }) => (
-            <NavLink key={path} end={path === '/'} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} to={path} onClick={() => setIsSidebarOpen(false)}>
-              <Icon size={17} strokeWidth={1.8} aria-hidden="true" /><span>{label}</span>
-            </NavLink>
-          ))}
+          {['Overview', 'Operations', 'Monitoring', 'Records', 'Administration'].map((group) => {
+            const items = visibleNavigation.filter((item) => item.group === group)
+            if (items.length === 0) return null
+            return (
+              <div className="nav-group" key={group}>
+                <p className="nav-label">{group}</p>
+                {items.map(({ label, path, icon: Icon }) => (
+                  <NavLink key={path} end={path === '/'} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} to={path} onClick={() => setIsSidebarOpen(false)}>
+                    <Icon size={17} strokeWidth={1.8} aria-hidden="true" /><span>{label}</span>
+                  </NavLink>
+                ))}
+              </div>
+            )
+          })}
         </nav>
-        <p className="sidebar-foot">REBEL TITANS <span>MITS Gwalior · SIH 2026</span></p>
       </aside>
 
       <section className="workspace">
@@ -473,29 +482,32 @@ function App() {
         {logoutError && <p className="module-error logout-message" role="status">{logoutError}</p>}
 
         <div className="content-grid dashboard-content">
-          {isDashboard ? (
-            <Dashboard
-              data={dashboardData}
-              isLoading={dashboardLoading}
-              error={dashboardError}
-              onRetry={() => void loadDashboard()}
-              firstName={user?.full_name.split(' ')[0] ?? 'there'}
-            />
-          ) : location.pathname === '/mines' ? <MinesPage />
-            : location.pathname === '/compliance' ? <CompliancePage />
-              : location.pathname === '/inspections' ? <InspectionsPage />
-                : location.pathname === '/violations' ? <ViolationsPage />
-                  : location.pathname === '/corrective-actions' ? <CorrectiveActionsPage />
-                    : location.pathname === '/contractors' ? <ContractorsPage />
-                      : location.pathname === '/alerts' ? <AlertsPage />
-                        : location.pathname === '/audit-trail' ? <AuditTrailPage />
-                          : location.pathname === '/ai-monitoring' ? <AIMonitoringPage />
-                            : location.pathname === '/risk-analytics' ? <RiskAnalyticsPage />
-                              : location.pathname === '/documents' ? <DocumentsPage />
-                                : location.pathname === '/gis-map' ? <GISMapPage />
-                                  : location.pathname === '/iot-monitoring' ? <IoTMonitoringPage />
-                                    : location.pathname === '/reports' ? <ReportsPage />
-                                      : <Dashboard data={dashboardData} isLoading={dashboardLoading} error={dashboardError} onRetry={() => void loadDashboard()} firstName={user?.full_name.split(' ')[0] ?? 'there'} />}
+          <Suspense fallback={<div className="page-loading" role="status"><span className="loading-icon" />Loading workspace…</div>}>
+            {isDashboard ? (
+              <Dashboard
+                data={dashboardData}
+                isLoading={dashboardLoading}
+                error={dashboardError}
+                onRetry={() => void loadDashboard()}
+                firstName={user?.full_name.split(' ')[0] ?? 'there'}
+              />
+            ) : location.pathname === '/mines' ? <MinesPage />
+              : location.pathname === '/compliance' ? <CompliancePage />
+                : location.pathname === '/inspections' ? <InspectionsPage />
+                  : location.pathname === '/violations' ? <ViolationsPage />
+                    : location.pathname === '/corrective-actions' ? <CorrectiveActionsPage />
+                      : location.pathname === '/contractors' ? <ContractorsPage />
+                        : location.pathname === '/alerts' ? <AlertsPage />
+                          : location.pathname === '/audit-trail' ? <AuditTrailPage />
+                            : location.pathname === '/ai-monitoring' ? <AIMonitoringPage />
+                              : location.pathname === '/risk-analytics' ? <RiskAnalyticsPage />
+                                : location.pathname === '/documents' ? <DocumentsPage />
+                                  : location.pathname === '/gis-map' ? <GISMapPage />
+                                    : location.pathname === '/iot-monitoring' ? <IoTMonitoringPage />
+                                      : location.pathname === '/reports' ? <ReportsPage />
+                                        : location.pathname === '/settings' ? <SettingsPage />
+                                          : <Dashboard data={dashboardData} isLoading={dashboardLoading} error={dashboardError} onRetry={() => void loadDashboard()} firstName={user?.full_name.split(' ')[0] ?? 'there'} />}
+          </Suspense>
         </div>
       </section>
     </main>

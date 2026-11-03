@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
+import axios from 'axios'
 import { Eye, EyeOff, LoaderCircle } from 'lucide-react'
 
 import { useAuth } from '../contexts/useAuth'
@@ -22,8 +23,12 @@ export default function LoginPage() {
       await login(email, password)
       const destination = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname ?? '/'
       navigate(destination, { replace: true })
-    } catch {
-      setError('Sign-in failed. Check the account details and confirm the API is running.')
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response?.status === 401) {
+        setError('Email or password is incorrect. Use an active account or the development demo account documented in README.md.')
+      } else {
+        setError('Could not sign in. Check that the API is available and try again.')
+      }
     } finally {
       setIsSubmitting(false)
     }
@@ -36,7 +41,6 @@ export default function LoginPage() {
         <p className="eyebrow login-eyebrow">MineGuard AI / secure operations</p>
         <h1>Safety decisions, grounded in the field.</h1>
         <p>Governance, compliance, and incident response for modern coal mine teams.</p>
-        <div className="login-visual-footer"><span>SIH 2026</span><span>MITS Gwalior / REBEL TITANS</span></div>
       </section>
 
       <section className="login-panel">
@@ -63,7 +67,6 @@ export default function LoginPage() {
             {error && <p className="login-error" role="alert">{error}</p>}
             <button className="login-button" type="submit" disabled={isSubmitting}>{isSubmitting ? <><LoaderCircle size={16} className="loading-icon" />Verifying access...</> : 'Sign in securely'}</button>
           </form>
-          <p className="login-mode"><span className="status-dot" />Development environment / AI demo mode</p>
         </div>
       </section>
     </main>

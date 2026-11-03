@@ -38,7 +38,6 @@ export default function AuditTrailPage() {
     <div className="audit-management">
       <div className="module-heading">
         <div>
-          <p className="eyebrow accent">Governance record / Phase 14</p>
           <h2>Audit trail</h2>
           <p>Trace important changes across the MineGuard operational system.</p>
         </div>
