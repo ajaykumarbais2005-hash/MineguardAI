@@ -1,8 +1,29 @@
 import './App.css'
-import { useEffect, useState } from 'react'
-import { NavLink, useLocation } from 'react-router-dom'
-import { Activity, AlertTriangle, BarChart3, Bell, CheckCircle2, ClipboardCheck, ClipboardList, FileSearch, FileText, HardHat, LayoutDashboard, Map, Menu, Mountain, Settings, ShieldCheck, Users, X } from 'lucide-react'
-import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import './design-system.css'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Link, Navigate, NavLink, useLocation } from 'react-router-dom'
+import {
+  Activity,
+  AlertTriangle,
+  BarChart3,
+  Bell,
+  CheckCircle2,
+  ClipboardCheck,
+  ClipboardList,
+  FileSearch,
+  FileText,
+  HardHat,
+  LayoutDashboard,
+  Map,
+  Menu,
+  Mountain,
+  Settings,
+  ShieldCheck,
+  Users,
+  X,
+  type LucideIcon,
+} from 'lucide-react'
+import { Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { useAuth } from './contexts/useAuth'
 import MinesPage from './pages/MinesPage'
 import CompliancePage from './pages/CompliancePage'
@@ -18,13 +39,46 @@ import DocumentsPage from './pages/DocumentsPage'
 import GISMapPage from './pages/GISMapPage'
 import IoTMonitoringPage from './pages/IoTMonitoringPage'
 import ReportsPage from './pages/ReportsPage'
-import { getWorkflowSummary, type WorkflowSummary } from './services/api'
+import {
+  getAlertSummary,
+  getComplianceSummary,
+  listAlerts,
+  listInspections,
+  listMines,
+  listRiskEvents,
+  listViolations,
+  type Alert,
+  type AlertSummary,
+  type ComplianceSummary,
+  type Inspection,
+  type Mine,
+  type RiskEvent,
+  type Violation,
+} from './services/api'
 
 type NavigationItem = {
   label: string
   path: string
-  icon: typeof LayoutDashboard
+  icon: LucideIcon
   roles?: string[]
+}
+
+type DashboardData = {
+  mines: Mine[]
+  inspections: Inspection[]
+  violations: Violation[]
+  riskEvents: RiskEvent[]
+  compliance: ComplianceSummary
+  alerts: Alert[]
+  alertSummary: AlertSummary
+}
+
+type ActivityItem = {
+  title: string
+  description: string
+  date: string
+  path: string
+  icon: LucideIcon
 }
 
 const navigationItems: NavigationItem[] = [
@@ -46,46 +100,337 @@ const navigationItems: NavigationItem[] = [
   { label: 'Settings', path: '/settings', icon: Settings, roles: ['ADMIN', 'MINE_MANAGER'] },
 ]
 
-const complianceTrend = [
-  { month: 'Apr', rate: 82, target: 90 }, { month: 'May', rate: 85, target: 90 }, { month: 'Jun', rate: 84, target: 90 },
-  { month: 'Jul', rate: 88, target: 90 }, { month: 'Aug', rate: 91, target: 90 }, { month: 'Sep', rate: 93, target: 90 },
-]
-const violationsBySeverity = [{ severity: 'Low', count: 18 }, { severity: 'Medium', count: 11 }, { severity: 'High', count: 7 }, { severity: 'Critical', count: 3 }]
-const riskDistribution = [{ name: 'Low', value: 42, color: '#4eac70' }, { name: 'Medium', value: 29, color: '#e4b44c' }, { name: 'High', value: 21, color: '#e17d45' }, { name: 'Critical', value: 8, color: '#b84f45' }]
-const inspectionsOverTime = [{ week: 'W1', completed: 18, planned: 22 }, { week: 'W2', completed: 23, planned: 24 }, { week: 'W3', completed: 20, planned: 25 }, { week: 'W4', completed: 28, planned: 28 }]
-const contractorCompliance = [{ name: 'Bharat Mine', score: 91 }, { name: 'Eastern IS', score: 76 }, { name: 'KCP Logistics', score: 72 }, { name: 'SafetyWorks', score: 88 }]
-const aiEvents = [{ day: 'Mon', ppe: 4, vehicle: 2, zone: 1 }, { day: 'Tue', ppe: 7, vehicle: 3, zone: 2 }, { day: 'Wed', ppe: 5, vehicle: 1, zone: 3 }, { day: 'Thu', ppe: 9, vehicle: 4, zone: 2 }, { day: 'Fri', ppe: 6, vehicle: 3, zone: 1 }, { day: 'Sat', ppe: 3, vehicle: 2, zone: 1 }]
-const sensorTrend = [{ time: '06:00', gas: 14, dust: 2.1 }, { time: '09:00', gas: 16, dust: 2.8 }, { time: '12:00', gas: 19, dust: 3.4 }, { time: '15:00', gas: 18, dust: 3.1 }, { time: '18:00', gas: 15, dust: 2.4 }, { time: '21:00', gas: 13, dust: 1.9 }]
-const capaStatus = [{ status: 'Open', count: 8 }, { status: 'In progress', count: 13 }, { status: 'Verification', count: 5 }, { status: 'Closed', count: 31 }]
-
-const chartTooltip = { contentStyle: { border: '1px solid #d0dbd1', borderRadius: 0, background: '#f6f8f4', fontSize: 12 }, itemStyle: { color: '#31544a' } }
-
-function KpiCard({ label, value, detail, icon: Icon, tone }: { label: string; value: string; detail: string; icon: typeof ShieldCheck; tone: string }) {
-  return <article className="dashboard-kpi"><div className={`kpi-icon ${tone}`}><Icon size={18} /></div><div><span>{label}</span><strong>{value}</strong><small>{detail}</small></div></article>
+const riskColors: Record<string, string> = {
+  LOW: '#16805d',
+  MEDIUM: '#b7791f',
+  HIGH: '#d05b24',
+  CRITICAL: '#c43d3d',
 }
 
-function ChartPanel({ title, subtitle, children, className = '' }: { title: string; subtitle: string; children: React.ReactNode; className?: string }) {
-  return <section className={`chart-panel ${className}`}><div className="chart-heading"><div><h3>{title}</h3><p>{subtitle}</p></div><span className="demo-chip">DEMO</span></div><div className="chart-body">{children}</div></section>
+const chartTooltip = {
+  contentStyle: {
+    border: '1px solid #d6dee8',
+    borderRadius: 8,
+    background: '#ffffff',
+    fontSize: 12,
+    boxShadow: '0 8px 24px #172b4d18',
+  },
+  itemStyle: { color: '#25364b' },
+}
+
+function KpiCard({ label, value, detail, icon: Icon, tone }: {
+  label: string
+  value: string
+  detail: string
+  icon: LucideIcon
+  tone: string
+}) {
+  return (
+    <article className="dashboard-kpi">
+      <div className={`kpi-icon ${tone}`} aria-hidden="true"><Icon size={18} /></div>
+      <div className="kpi-copy">
+        <span>{label}</span>
+        <strong>{value}</strong>
+        <small>{detail}</small>
+      </div>
+    </article>
+  )
+}
+
+function ChartPanel({ title, subtitle, children }: {
+  title: string
+  subtitle: string
+  children: React.ReactNode
+}) {
+  return (
+    <section className="chart-panel">
+      <div className="chart-heading">
+        <div><h3>{title}</h3><p>{subtitle}</p></div>
+        <span className="data-source-chip">API DATA</span>
+      </div>
+      <div className="chart-body">{children}</div>
+    </section>
+  )
+}
+
+function EmptyChart() {
+  return <div className="chart-empty">No records available for this view yet.</div>
+}
+
+function Dashboard({ data, isLoading, error, onRetry, firstName }: {
+  data: DashboardData | null
+  isLoading: boolean
+  error: string
+  onRetry: () => void
+  firstName: string
+}) {
+  const activeInspections = data?.inspections.filter((inspection) => ['DRAFT', 'IN_PROGRESS'].includes(inspection.status)).length ?? 0
+  const activeMines = data?.mines.filter((mine) => mine.status === 'ACTIVE').length ?? 0
+  const criticalRisks = data?.riskEvents.filter((event) => event.level.toUpperCase() === 'CRITICAL').length ?? 0
+  const compliancePercent = data && data.compliance.total > 0
+    ? Math.round((data.compliance.compliant / data.compliance.total) * 100)
+    : null
+  const activeAlerts = data ? data.alertSummary.unread + data.alertSummary.acknowledged : 0
+
+  const riskDistribution = useMemo(() => {
+    const levels = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']
+    return levels.map((level) => ({
+      name: level.charAt(0) + level.slice(1).toLowerCase(),
+      value: data?.riskEvents.filter((event) => event.level.toUpperCase() === level).length ?? 0,
+      color: riskColors[level],
+    }))
+  }, [data])
+
+  const violationCounts = useMemo(() => {
+    const levels = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']
+    return levels.map((severity) => ({
+      severity: severity.charAt(0) + severity.slice(1).toLowerCase(),
+      count: data?.violations.filter((violation) => violation.severity.toUpperCase() === severity).length ?? 0,
+    }))
+  }, [data])
+
+  const inspectionCounts = useMemo(() => {
+    const statuses = ['DRAFT', 'IN_PROGRESS', 'SUBMITTED', 'REVIEWED', 'CLOSED']
+    return statuses.map((status) => ({
+      status: status.replaceAll('_', ' ').toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase()),
+      count: data?.inspections.filter((inspection) => inspection.status === status).length ?? 0,
+    }))
+  }, [data])
+
+  const recentActivities = useMemo<ActivityItem[]>(() => {
+    if (!data) return []
+    const entries: Array<ActivityItem & { timestamp: number }> = [
+      ...data.alerts.map((alert) => ({
+        title: `Alert ${alert.status.toLowerCase()}`,
+        description: `${alert.alert_type.replaceAll('_', ' ')} / ${alert.mine_name}`,
+        date: new Date(alert.created_at).toLocaleString('en-IN'),
+        timestamp: new Date(alert.created_at).getTime(),
+        path: '/alerts',
+        icon: Bell,
+      })),
+      ...data.violations.map((violation) => ({
+        title: `Violation ${violation.status.toLowerCase().replaceAll('_', ' ')}`,
+        description: `${violation.violation_code} / ${violation.mine_name}`,
+        date: new Date(violation.detected_at).toLocaleString('en-IN'),
+        timestamp: new Date(violation.detected_at).getTime(),
+        path: '/violations',
+        icon: AlertTriangle,
+      })),
+      ...data.inspections.map((inspection) => ({
+        title: `Inspection ${inspection.status.toLowerCase().replaceAll('_', ' ')}`,
+        description: `${inspection.checklist_name} / ${inspection.mine_name}`,
+        date: new Date(inspection.submitted_at ?? inspection.started_at).toLocaleString('en-IN'),
+        timestamp: new Date(inspection.submitted_at ?? inspection.started_at).getTime(),
+        path: '/inspections',
+        icon: ClipboardCheck,
+      })),
+    ]
+    return entries
+      .filter((entry) => Number.isFinite(entry.timestamp))
+      .sort((left, right) => right.timestamp - left.timestamp)
+      .slice(0, 5)
+  }, [data])
+
+  return (
+    <>
+      <div className="dashboard-heading">
+        <div>
+          <p className="eyebrow accent">Operational overview</p>
+          <h2>Welcome back, {firstName}.</h2>
+          <p>Current safety and compliance signals from the MineGuard API.</p>
+        </div>
+        <span className="live-chip"><span className="status-dot" />Live API data</span>
+      </div>
+
+      {error && <div className="module-error dashboard-error" role="alert">
+        <span>{error}</span><button type="button" className="secondary-action" onClick={onRetry}>Retry</button>
+      </div>}
+
+      {isLoading ? (
+        <div className="kpi-grid" aria-label="Loading dashboard data" aria-busy="true">
+          {Array.from({ length: 6 }, (_, index) => <div className="dashboard-kpi dashboard-kpi-skeleton" key={index}><span /><span /><span /></div>)}
+        </div>
+      ) : data ? (
+        <>
+          <div className="kpi-grid">
+            <KpiCard label="Total mines" value={String(data.mines.length)} detail={`${activeMines} active sites`} icon={Mountain} tone="green" />
+            <KpiCard label="Active inspections" value={String(activeInspections)} detail={`${data.inspections.length} records`} icon={ClipboardCheck} tone="blue" />
+            <KpiCard label="Open violations" value={String(data.violations.filter((item) => !['RESOLVED', 'VERIFIED', 'CLOSED'].includes(item.status)).length)} detail={`${data.violations.length} total records`} icon={AlertTriangle} tone="red" />
+            <KpiCard label="Critical risks" value={String(criticalRisks)} detail={`${data.riskEvents.length} risk events`} icon={ShieldCheck} tone="amber" />
+            <KpiCard label="Compliant requirements" value={compliancePercent === null ? '—' : `${compliancePercent}%`} detail={`${data.compliance.compliant} of ${data.compliance.total} fully compliant`} icon={CheckCircle2} tone="teal" />
+            <KpiCard label="Active alerts" value={String(activeAlerts)} detail={`${data.alertSummary.unread} unread`} icon={Bell} tone="orange" />
+          </div>
+
+          <div className="dashboard-safety-strip">
+            <div><span className="eyebrow">Mine safety overview</span><strong>{activeMines} of {data.mines.length} sites active</strong></div>
+            <div><span>High-risk sites</span><strong>{data.mines.filter((mine) => ['HIGH', 'CRITICAL'].includes(mine.risk_level.toUpperCase())).length}</strong></div>
+            <div><span>Overdue compliance</span><strong>{data.compliance.overdue}</strong></div>
+            <Link to="/mines">View mine register</Link>
+          </div>
+
+          <div className="chart-grid chart-grid-primary">
+            <ChartPanel title="Risk distribution" subtitle="Recorded risk events by assessed level">
+              {data.riskEvents.length === 0 ? <EmptyChart /> : <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={riskDistribution} dataKey="value" nameKey="name" innerRadius="58%" outerRadius="78%" paddingAngle={3}>
+                    {riskDistribution.map((entry) => <Cell key={entry.name} fill={entry.color} />)}
+                  </Pie>
+                  <Tooltip {...chartTooltip} />
+                  <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
+                </PieChart>
+              </ResponsiveContainer>}
+            </ChartPanel>
+            <ChartPanel title="Violations by severity" subtitle="Current violation register, grouped by severity">
+              {data.violations.length === 0 ? <EmptyChart /> : <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={violationCounts} layout="vertical" margin={{ left: 4, right: 12 }}>
+                  <CartesianGrid stroke="#e8edf3" horizontal={false} />
+                  <XAxis type="number" allowDecimals={false} tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: '#61738a' }} />
+                  <YAxis dataKey="severity" type="category" width={64} tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: '#61738a' }} />
+                  <Tooltip {...chartTooltip} />
+                  <Bar dataKey="count" name="Violations" fill="#d05b24" radius={[0, 5, 5, 0]} />
+                </BarChart>
+              </ResponsiveContainer>}
+            </ChartPanel>
+          </div>
+
+          <div className="chart-grid chart-grid-secondary">
+            <ChartPanel title="Inspection status" subtitle="Records currently in the inspection workflow">
+              {data.inspections.length === 0 ? <EmptyChart /> : <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={inspectionCounts} margin={{ left: 0, right: 12 }}>
+                  <CartesianGrid stroke="#e8edf3" vertical={false} />
+                  <XAxis dataKey="status" tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: '#61738a' }} />
+                  <YAxis allowDecimals={false} tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: '#61738a' }} />
+                  <Tooltip {...chartTooltip} />
+                  <Legend wrapperStyle={{ fontSize: 12 }} />
+                  <Bar dataKey="count" name="Inspections" fill="#2563a6" radius={[5, 5, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>}
+            </ChartPanel>
+            <section className="dashboard-list-panel">
+              <div className="list-heading"><div><p className="eyebrow">Live register</p><h3>Priority alerts</h3></div><Link to="/alerts">View all</Link></div>
+              {!data.alerts.length ? <p className="inspection-empty">No alerts have been recorded.</p> : <div className="alert-list">
+                {data.alerts.slice(0, 4).map((alert) => <div className="alert-row" key={alert.id}>
+                  <span className={`alert-severity ${alert.severity.toLowerCase()}`}>{alert.severity}</span>
+                  <div><strong>{alert.message}</strong><small>{alert.mine_name} / {alert.zone_name ?? 'All zones'}</small></div>
+                  <time>{new Date(alert.created_at).toLocaleDateString('en-IN')}</time>
+                </div>)}
+              </div>}
+            </section>
+            <section className="dashboard-list-panel">
+              <div className="list-heading"><div><p className="eyebrow">Recent records</p><h3>Recent activity</h3></div><Link to="/violations">Open register</Link></div>
+              {!recentActivities.length ? <p className="inspection-empty">No recent records are available.</p> : <div className="activity-list">
+                {recentActivities.map((item, index) => {
+                  const Icon = item.icon
+                  return <div key={`${item.path}-${item.title}-${index}`}>
+                    <Icon size={16} aria-hidden="true" />
+                    <p><strong>{item.title}</strong><span>{item.description}</span></p>
+                    <time>{item.date}</time>
+                  </div>
+                })}
+              </div>}
+            </section>
+          </div>
+          <p className="dashboard-disclaimer">Dashboard figures are derived from persisted API records; development environments may include seeded demonstration data.</p>
+        </>
+      ) : null}
+    </>
+  )
 }
 
 function App() {
   const { user, logout } = useAuth()
   const location = useLocation()
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
-  const [workflowSummary, setWorkflowSummary] = useState<WorkflowSummary | null>(null)
+  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null)
+  const [dashboardLoading, setDashboardLoading] = useState(true)
+  const [dashboardError, setDashboardError] = useState('')
+  const [unreadAlertCount, setUnreadAlertCount] = useState<number | null>(null)
+  const [logoutError, setLogoutError] = useState('')
   const visibleNavigation = navigationItems.filter((item) => !item.roles || item.roles.includes(user?.role ?? ''))
+  const restrictedPage = navigationItems.find(
+    (item) => item.path === location.pathname && item.roles && !item.roles.includes(user?.role ?? ''),
+  )
+  const currentPage = navigationItems.find((item) => item.path === location.pathname)
+  const isDashboard = location.pathname === '/'
+    || location.pathname === '/settings'
+    || !navigationItems.some((item) => item.path === location.pathname)
 
-  useEffect(() => { void getWorkflowSummary().then(setWorkflowSummary).catch(() => setWorkflowSummary(null)) }, [])
+  const loadDashboard = useCallback(async () => {
+    setDashboardLoading(true)
+    setDashboardError('')
+    try {
+      const [mines, inspections, violations, riskEvents, compliance, alerts, alertSummary] = await Promise.all([
+        listMines(),
+        listInspections(),
+        listViolations(),
+        listRiskEvents(),
+        getComplianceSummary(),
+        listAlerts(),
+        getAlertSummary(),
+      ])
+      setDashboardData({ mines, inspections, violations, riskEvents, compliance, alerts, alertSummary })
+      setUnreadAlertCount(alertSummary.unread)
+    } catch {
+      setDashboardError('Dashboard data could not be loaded. Check the API connection and try again.')
+    } finally {
+      setDashboardLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (isDashboard) {
+      void loadDashboard()
+      return
+    }
+
+    let active = true
+    void getAlertSummary()
+      .then((summary) => {
+        if (active) setUnreadAlertCount(summary.unread)
+      })
+      .catch(() => {
+        if (active) setUnreadAlertCount(null)
+      })
+    return () => { active = false }
+  }, [isDashboard, loadDashboard])
+  useEffect(() => { setIsSidebarOpen(false) }, [location.pathname])
+  useEffect(() => {
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === 'Escape') setIsSidebarOpen(false)
+    }
+    window.addEventListener('keydown', closeOnEscape)
+    return () => window.removeEventListener('keydown', closeOnEscape)
+  }, [])
+
+  async function handleLogout() {
+    setLogoutError('')
+    try {
+      await logout()
+    } catch {
+      setLogoutError('The server could not confirm sign-out. Your local session has been cleared.')
+    }
+  }
+
+  if (restrictedPage) {
+    return <Navigate to="/" replace />
+  }
 
   return (
     <main className="app-shell">
-      <button className={`sidebar-scrim ${isSidebarOpen ? 'scrim-open' : ''}`} type="button" aria-label="Close navigation" onClick={() => setIsSidebarOpen(false)} />
+      <button
+        className={`sidebar-scrim ${isSidebarOpen ? 'scrim-open' : ''}`}
+        type="button"
+        aria-label="Close navigation"
+        aria-hidden={!isSidebarOpen}
+        tabIndex={isSidebarOpen ? 0 : -1}
+        onClick={() => setIsSidebarOpen(false)}
+      />
       <aside className={`sidebar ${isSidebarOpen ? 'sidebar-open' : ''}`}>
         <div className="sidebar-heading">
-          <div className="brand-mark">MG</div>
+          <div className="brand-mark" aria-hidden="true">MG</div>
           <div>
-            <p className="eyebrow">MineGuard</p>
-            <p className="brand-name">AI Command</p>
+            <p className="eyebrow">MineGuard AI</p>
+            <p className="brand-name">Safety operations</p>
           </div>
           <button className="sidebar-close" type="button" aria-label="Close navigation" onClick={() => setIsSidebarOpen(false)}><X size={18} /></button>
         </div>
@@ -93,72 +438,64 @@ function App() {
         <p className="nav-label">Workspace</p>
         <nav className="primary-navigation" aria-label="Primary navigation">
           {visibleNavigation.map(({ label, path, icon: Icon }) => (
-            <NavLink key={path} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} to={path} onClick={() => setIsSidebarOpen(false)}>
-              <Icon size={16} strokeWidth={1.8} /><span>{label}</span>
+            <NavLink key={path} end={path === '/'} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} to={path} onClick={() => setIsSidebarOpen(false)}>
+              <Icon size={17} strokeWidth={1.8} aria-hidden="true" /><span>{label}</span>
             </NavLink>
           ))}
         </nav>
-        <p className="sidebar-foot">SIH 2026 / MITS Gwalior</p>
+        <p className="sidebar-foot">REBEL TITANS <span>MITS Gwalior · SIH 2026</span></p>
       </aside>
 
-      <section className="workspace" id="dashboard">
+      <section className="workspace">
         <header className="topbar">
           <div className="topbar-heading">
-            <button className="menu-button" type="button" aria-label="Open navigation" onClick={() => setIsSidebarOpen(true)}><Menu size={20} /></button>
+            <button
+              className="menu-button"
+              type="button"
+              aria-label={isSidebarOpen ? 'Close navigation' : 'Open navigation'}
+              aria-expanded={isSidebarOpen}
+              onClick={() => setIsSidebarOpen((open) => !open)}
+            ><Menu size={20} /></button>
             <div>
-            <p className="eyebrow">Governance console / Phase 06</p>
-            <h1>Mine safety overview</h1>
+              <p className="eyebrow">MineGuard AI / Safety operations</p>
+              <h1>{currentPage?.label ?? 'Dashboard'}</h1>
             </div>
           </div>
           <div className="session-actions">
-            <span className="user-badge">{user?.full_name} / {user?.role.replace('_', ' ')}</span>
-            <button className="logout-button" type="button" onClick={() => void logout()}>Sign out</button>
+            <NavLink to="/alerts" className="notification-link" aria-label="View active alerts">
+              <Bell size={18} /><span>Alerts</span>
+              {unreadAlertCount !== null && unreadAlertCount > 0 && <b>{unreadAlertCount}</b>}
+            </NavLink>
+            <span className="user-badge"><span className="profile-initial">{user?.full_name.charAt(0).toUpperCase()}</span><span>{user?.full_name}<small>{user?.role.replaceAll('_', ' ')}</small></span></span>
+            <button className="logout-button" type="button" onClick={() => void handleLogout()}>Sign out</button>
           </div>
         </header>
+        {logoutError && <p className="module-error logout-message" role="status">{logoutError}</p>}
 
         <div className="content-grid dashboard-content">
-          {location.pathname === '/mines' ? <MinesPage /> : location.pathname === '/compliance' ? <CompliancePage /> : location.pathname === '/inspections' ? <InspectionsPage /> : location.pathname === '/violations' ? <ViolationsPage /> : location.pathname === '/corrective-actions' ? <CorrectiveActionsPage /> : location.pathname === '/contractors' ? <ContractorsPage /> : location.pathname === '/alerts' ? <AlertsPage /> : location.pathname === '/audit-trail' ? <AuditTrailPage /> : location.pathname === '/ai-monitoring' ? <AIMonitoringPage /> : location.pathname === '/risk-analytics' ? <RiskAnalyticsPage /> : location.pathname === '/documents' ? <DocumentsPage /> : location.pathname === '/gis-map' ? <GISMapPage /> : location.pathname === '/iot-monitoring' ? <IoTMonitoringPage /> : location.pathname === '/reports' ? <ReportsPage /> : <>
-          <div className="dashboard-heading">
-            <div><p className="eyebrow accent">Network command view</p><h2>Good morning, {user?.full_name.split(' ')[0]}.</h2><p>Operational signals across five monitored mine sites.</p></div>
-            <div className="dashboard-filters"><span className="date-range">01 Sep - 04 Sep 2026</span><span className="live-chip"><span className="status-dot" />Live snapshot</span></div>
-          </div>
-
-          <div className="kpi-grid">
-            <KpiCard label="Total mines" value="05" detail="4 active / 1 maintenance" icon={Mountain} tone="green" />
-            <KpiCard label="Compliance rate" value="93.2%" detail="+2.1% vs last month" icon={ShieldCheck} tone="blue" />
-            <KpiCard label="Open violations" value={workflowSummary ? String(workflowSummary.open_violations) : "39"} detail={workflowSummary ? `${workflowSummary.unread_alerts} unread alerts` : "3 critical / 7 high"} icon={AlertTriangle} tone="red" />
-            <KpiCard label="Safety risk score" value="38 / 100" detail="Medium network exposure" icon={BarChart3} tone="amber" />
-            <KpiCard label="AI safety events" value={workflowSummary ? String(workflowSummary.ai_events) : "34"} detail={workflowSummary ? `${workflowSummary.risk_events} linked risk events` : "Last 7 days / demo mode"} icon={HardHat} tone="orange" />
-            <KpiCard label="Inspection completion" value="87%" detail="96 of 110 planned" icon={ClipboardCheck} tone="teal" />
-          </div>
-
-          <div className="chart-grid chart-grid-primary">
-            <ChartPanel title="Compliance trend" subtitle="Network score against 90% operating target" className="chart-wide">
-              <ResponsiveContainer><LineChart data={complianceTrend}><CartesianGrid stroke="#dfe6df" vertical={false} /><XAxis dataKey="month" tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: '#71827b' }} /><YAxis domain={[70, 100]} tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: '#71827b' }} /><Tooltip {...chartTooltip} /><Legend iconType="line" wrapperStyle={{ fontSize: 11 }} /><Line type="monotone" dataKey="rate" name="Compliance" stroke="#28564b" strokeWidth={3} dot={{ r: 3, fill: '#f1a24a' }} /><Line type="monotone" dataKey="target" name="Target" stroke="#b8c7bc" strokeDasharray="5 5" /></LineChart></ResponsiveContainer>
-            </ChartPanel>
-            <ChartPanel title="Risk distribution" subtitle="Current exposure by severity band">
-              <ResponsiveContainer><PieChart><Pie data={riskDistribution} dataKey="value" nameKey="name" innerRadius="57%" outerRadius="78%" paddingAngle={3}><Cell fill="#4eac70" /><Cell fill="#e4b44c" /><Cell fill="#e17d45" /><Cell fill="#b84f45" /></Pie><Tooltip {...chartTooltip} /><Legend iconType="circle" wrapperStyle={{ fontSize: 11 }} /></PieChart></ResponsiveContainer>
-            </ChartPanel>
-          </div>
-
-          <div className="chart-grid">
-            <ChartPanel title="Violations by severity" subtitle="Open and in-progress findings"><ResponsiveContainer><BarChart data={violationsBySeverity} layout="vertical"><CartesianGrid stroke="#dfe6df" horizontal={false} /><XAxis type="number" tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: '#71827b' }} /><YAxis dataKey="severity" type="category" width={58} tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: '#71827b' }} /><Tooltip {...chartTooltip} /><Bar dataKey="count" name="Findings" fill="#e17d45" barSize={18} radius={[0, 2, 2, 0]} /></BarChart></ResponsiveContainer></ChartPanel>
-            <ChartPanel title="Inspections over time" subtitle="Planned versus completed rounds"><ResponsiveContainer><AreaChart data={inspectionsOverTime}><CartesianGrid stroke="#dfe6df" vertical={false} /><XAxis dataKey="week" tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: '#71827b' }} /><YAxis tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: '#71827b' }} /><Tooltip {...chartTooltip} /><Legend iconType="line" wrapperStyle={{ fontSize: 11 }} /><Area type="monotone" dataKey="planned" name="Planned" stroke="#b8c7bc" fill="#e7eee8" /><Area type="monotone" dataKey="completed" name="Completed" stroke="#28564b" fill="#b9d3c2" /></AreaChart></ResponsiveContainer></ChartPanel>
-            <ChartPanel title="Contractor compliance" subtitle="Current partner scores"><ResponsiveContainer><BarChart data={contractorCompliance}><CartesianGrid stroke="#dfe6df" vertical={false} /><XAxis dataKey="name" tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: '#71827b' }} /><YAxis domain={[0, 100]} tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: '#71827b' }} /><Tooltip {...chartTooltip} /><Bar dataKey="score" name="Score" fill="#4eac70" barSize={24} radius={[2, 2, 0, 0]} /></BarChart></ResponsiveContainer></ChartPanel>
-          </div>
-
-          <div className="chart-grid">
-            <ChartPanel title="AI safety events" subtitle="Detection volume by event class"><ResponsiveContainer><BarChart data={aiEvents}><CartesianGrid stroke="#dfe6df" vertical={false} /><XAxis dataKey="day" tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: '#71827b' }} /><YAxis tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: '#71827b' }} /><Tooltip {...chartTooltip} /><Legend iconType="rect" wrapperStyle={{ fontSize: 11 }} /><Bar dataKey="ppe" name="PPE" stackId="events" fill="#e17d45" /><Bar dataKey="vehicle" name="Vehicle" stackId="events" fill="#e4b44c" /><Bar dataKey="zone" name="Zone" stackId="events" fill="#4eac70" /></BarChart></ResponsiveContainer></ChartPanel>
-            <ChartPanel title="IoT sensor trend" subtitle="Simulated gas ppm and dust mg/m3"><ResponsiveContainer><LineChart data={sensorTrend}><CartesianGrid stroke="#dfe6df" vertical={false} /><XAxis dataKey="time" tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: '#71827b' }} /><YAxis yAxisId="left" tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: '#71827b' }} /><Tooltip {...chartTooltip} /><Legend iconType="line" wrapperStyle={{ fontSize: 11 }} /><Line yAxisId="left" type="monotone" dataKey="gas" name="Gas ppm" stroke="#b84f45" strokeWidth={2} /><Line yAxisId="left" type="monotone" dataKey="dust" name="Dust mg/m3" stroke="#e4b44c" strokeWidth={2} /></LineChart></ResponsiveContainer></ChartPanel>
-            <ChartPanel title="Corrective action status" subtitle="CAPA queue across all sites"><ResponsiveContainer><BarChart data={capaStatus}><CartesianGrid stroke="#dfe6df" vertical={false} /><XAxis dataKey="status" tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: '#71827b' }} /><YAxis tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: '#71827b' }} /><Tooltip {...chartTooltip} /><Bar dataKey="count" name="Actions" fill="#28564b" barSize={30} radius={[2, 2, 0, 0]} /></BarChart></ResponsiveContainer></ChartPanel>
-          </div>
-
-          <div className="dashboard-bottom-grid">
-            <section className="dashboard-list-panel"><div className="list-heading"><div><p className="eyebrow">Attention queue</p><h3>Priority alerts</h3></div><NavLink to="/alerts">View all</NavLink></div><div className="alert-list"><div className="alert-row"><span className="alert-severity critical">CRITICAL</span><div><strong>Gas threshold approaching</strong><small>Gevra Central Block / Processing Area</small></div><time>08 min</time></div><div className="alert-row"><span className="alert-severity high">HIGH</span><div><strong>PPE violation detected</strong><small>Kusmunda North / Main Haul Road</small></div><time>18 min</time></div><div className="alert-row"><span className="alert-severity medium">MEDIUM</span><div><strong>Compliance verification overdue</strong><small>Raniganj Safety Pilot / Statutory review</small></div><time>42 min</time></div></div></section>
-            <section className="dashboard-list-panel"><div className="list-heading"><div><p className="eyebrow">System log</p><h3>Recent activity</h3></div><NavLink to="/audit-trail">Audit trail</NavLink></div><div className="activity-list"><div><CheckCircle2 size={16} /><p><strong>Inspection submitted</strong><span>Daily transport safety / INS-2026-0001</span></p><time>12:14</time></div><div><HardHat size={16} /><p><strong>AI event linked</strong><span>No helmet event / CAM-HAUL-01</span></p><time>11:56</time></div><div><ClipboardList size={16} /><p><strong>CAPA assigned</strong><span>CAPA-2026-0001 to Bharat Mine Services</span></p><time>11:42</time></div></div></section>
-          </div>
-          <p className="dashboard-disclaimer"><span className="status-dot" />Workflow KPIs include live persisted AI, risk, violation, alert, and CAPA records; chart trends remain demo data.</p>
-          </>}
+          {isDashboard ? (
+            <Dashboard
+              data={dashboardData}
+              isLoading={dashboardLoading}
+              error={dashboardError}
+              onRetry={() => void loadDashboard()}
+              firstName={user?.full_name.split(' ')[0] ?? 'there'}
+            />
+          ) : location.pathname === '/mines' ? <MinesPage />
+            : location.pathname === '/compliance' ? <CompliancePage />
+              : location.pathname === '/inspections' ? <InspectionsPage />
+                : location.pathname === '/violations' ? <ViolationsPage />
+                  : location.pathname === '/corrective-actions' ? <CorrectiveActionsPage />
+                    : location.pathname === '/contractors' ? <ContractorsPage />
+                      : location.pathname === '/alerts' ? <AlertsPage />
+                        : location.pathname === '/audit-trail' ? <AuditTrailPage />
+                          : location.pathname === '/ai-monitoring' ? <AIMonitoringPage />
+                            : location.pathname === '/risk-analytics' ? <RiskAnalyticsPage />
+                              : location.pathname === '/documents' ? <DocumentsPage />
+                                : location.pathname === '/gis-map' ? <GISMapPage />
+                                  : location.pathname === '/iot-monitoring' ? <IoTMonitoringPage />
+                                    : location.pathname === '/reports' ? <ReportsPage />
+                                      : <Dashboard data={dashboardData} isLoading={dashboardLoading} error={dashboardError} onRetry={() => void loadDashboard()} firstName={user?.full_name.split(' ')[0] ?? 'there'} />}
         </div>
       </section>
     </main>

@@ -1,38 +1,44 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import axios from 'axios'
 
-import { AUTH_TOKEN_KEY, currentUserRequest, loginRequest, logoutRequest, type AuthUser } from '../services/api'
+import { AUTH_UNAUTHORIZED_EVENT, currentUserRequest, loginRequest, logoutRequest, setAccessToken, type AuthUser } from '../services/api'
 import { authContext } from './auth-context'
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null)
-  const [isLoading, setIsLoading] = useState(() => Boolean(localStorage.getItem(AUTH_TOKEN_KEY)))
+  const [isLoading, setIsLoading] = useState(false)
 
   useEffect(() => {
-    const token = localStorage.getItem(AUTH_TOKEN_KEY)
-    if (!token) {
-      return
+    function handleUnauthorized() {
+      setAccessToken(null)
+      setUser(null)
+      setIsLoading(false)
     }
 
-    currentUserRequest()
-      .then(setUser)
-      .catch(() => {
-        localStorage.removeItem(AUTH_TOKEN_KEY)
-        setUser(null)
-        
-      })
-      .finally(() => setIsLoading(false))
+    window.addEventListener(AUTH_UNAUTHORIZED_EVENT, handleUnauthorized)
+    return () => window.removeEventListener(AUTH_UNAUTHORIZED_EVENT, handleUnauthorized)
   }, [])
 
   async function login(email: string, password: string) {
-    const token = await loginRequest(email, password)
-    localStorage.setItem(AUTH_TOKEN_KEY, token.access_token)
-    setUser(await currentUserRequest())
+    setIsLoading(true)
+    setAccessToken(null)
+    setUser(null)
+    try {
+      const token = await loginRequest(email, password)
+      setAccessToken(token.access_token)
+      setUser(await currentUserRequest())
+    } catch (error) {
+      setAccessToken(null)
+      setUser(null)
+      throw error
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   async function logout() {
     try {
-      if (localStorage.getItem(AUTH_TOKEN_KEY)) {
+      if (user) {
         await logoutRequest()
       }
     } catch (error) {
@@ -40,7 +46,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw error
       }
     } finally {
-      localStorage.removeItem(AUTH_TOKEN_KEY)
+      setAccessToken(null)
       setUser(null)
     }
   }

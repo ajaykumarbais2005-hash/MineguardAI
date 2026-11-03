@@ -28,5 +28,5 @@ def add_alert(payload: AlertCreate, database: Session = Depends(get_db), actor: 
 
 
 @router.patch("/{alert_id}", response_model=AlertResponse)
-def edit_alert(alert_id: int, next_status: str = Query(..., alias="status"), database: Session = Depends(get_db), actor: User = Depends(get_current_user)) -> AlertResponse:
+def edit_alert(alert_id: int, next_status: str = Query(..., alias="status"), database: Session = Depends(get_db), actor: User = Depends(require_roles("ADMIN", "MINE_MANAGER", "SAFETY_OFFICER"))) -> AlertResponse:
     return update_alert(database, alert_id, next_status, actor)

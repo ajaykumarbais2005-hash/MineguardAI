@@ -2,7 +2,11 @@ services:
   backend:
     build: ./backend
     environment:
-      DATABASE_URL: sqlite:///./mineguard.db
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      DATABASE_URL: ${DATABASE_URL:-sqlite:///./mineguard.db}
+      JWT_SECRET: ${JWT_SECRET:-development-only-secret-change-me-32-bytes}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
+      UPLOAD_DIRECTORY: ${UPLOAD_DIRECTORY:-data/uploads}
       AI_MODE: DEMO_SIMULATION
     ports:
       - "8000:8000"

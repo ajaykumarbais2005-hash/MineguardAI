@@ -7,6 +7,26 @@ from app.models import AuditLog
 from app.schemas.audit import AuditResponse, AuditSummary
 
 
+def record_security_event(
+    database: Session,
+    action: str,
+    description: str,
+    actor_id: Optional[int] = None,
+    ip_address: Optional[str] = None,
+) -> None:
+    database.add(
+        AuditLog(
+            user_id=actor_id,
+            action=action,
+            entity="Authentication",
+            entity_id=str(actor_id) if actor_id is not None else None,
+            description=description,
+            ip_address=ip_address,
+        )
+    )
+    database.commit()
+
+
 def list_logs(database: Session, action: Optional[str], entity: Optional[str], search: Optional[str]) -> list[AuditResponse]:
     query = database.query(AuditLog).options(joinedload(AuditLog.user))
     if action:

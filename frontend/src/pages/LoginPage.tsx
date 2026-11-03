@@ -1,36 +1,18 @@
 import { useState, type FormEvent } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { Eye, EyeOff, LoaderCircle } from 'lucide-react'
 
 import { useAuth } from '../contexts/useAuth'
-
-type DemoAccount = { label: string; email: string; password: string }
-
-const demoAccounts: DemoAccount[] = [
-  { label: 'Administrator', email: 'admin@mineguard.ai', password: 'admin123' },
-  { label: 'Mine Manager', email: 'manager@mineguard.ai', password: 'manager123' },
-  { label: 'Safety Officer', email: 'safety@mineguard.ai', password: 'safety123' },
-  { label: 'Inspector', email: 'inspector@mineguard.ai', password: 'inspector123' },
-  { label: 'Contractor', email: 'contractor@mineguard.ai', password: 'contractor123' },
-  { label: 'Auditor', email: 'auditor@mineguard.ai', password: 'auditor123' },
-]
 
 export default function LoginPage() {
   const { login } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
-  const [email, setEmail] = useState('admin@mineguard.ai')
-  const [password, setPassword] = useState('admin123')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false)
   const [error, setError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
-
-  function selectDemoAccount(value: string) {
-    const account = demoAccounts.find(({ email: accountEmail }) => accountEmail === value)
-    if (account) {
-      setEmail(account.email)
-      setPassword(account.password)
-      setError('')
-    }
-  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -63,16 +45,23 @@ export default function LoginPage() {
           <h2>Sign in</h2>
           <p className="login-subtitle">Use an authorized MineGuard account to continue.</p>
           <form onSubmit={handleSubmit}>
-            <label htmlFor="demo-account">Demo account</label>
-            <select id="demo-account" value={email} onChange={(event) => selectDemoAccount(event.target.value)}>
-              {demoAccounts.map((account) => <option key={account.email} value={account.email}>{account.label} / {account.email}</option>)}
-            </select>
             <label htmlFor="email">Email address</label>
-            <input id="email" type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
+            <input id="email" type="email" autoComplete="username" autoCapitalize="none" maxLength={254} value={email} onChange={(event) => { setEmail(event.target.value); setError('') }} required />
             <label htmlFor="password">Password</label>
-            <input id="password" type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} required />
+            <div className="login-password-field">
+              <input id="password" type={isPasswordVisible ? 'text' : 'password'} autoComplete="current-password" maxLength={72} value={password} onChange={(event) => { setPassword(event.target.value); setError('') }} required />
+              <button
+                className="password-visibility"
+                type="button"
+                aria-label={isPasswordVisible ? 'Hide password' : 'Show password'}
+                aria-pressed={isPasswordVisible}
+                onClick={() => setIsPasswordVisible((visible) => !visible)}
+              >
+                {isPasswordVisible ? <EyeOff size={17} /> : <Eye size={17} />}
+              </button>
+            </div>
             {error && <p className="login-error" role="alert">{error}</p>}
-            <button className="login-button" type="submit" disabled={isSubmitting}>{isSubmitting ? 'Verifying access...' : 'Enter command center'}</button>
+            <button className="login-button" type="submit" disabled={isSubmitting}>{isSubmitting ? <><LoaderCircle size={16} className="loading-icon" />Verifying access...</> : 'Sign in securely'}</button>
           </form>
           <p className="login-mode"><span className="status-dot" />Development environment / AI demo mode</p>
         </div>

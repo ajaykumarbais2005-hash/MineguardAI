@@ -4,6 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.auth.security import hash_password
+from app.config import get_settings
 from app.models import (
     AIEvent,
     Alert,
@@ -44,6 +45,8 @@ def _demo_password(email: str) -> str:
 def seed_demo_data(session: Session) -> dict[str, int]:
     if session.scalar(select(Role.id).limit(1)) is not None:
         return {table: session.query(model).count() for table, model in _seed_models().items()}
+    if get_settings().environment.lower() not in {"development", "dev", "testing", "test"}:
+        return {table: 0 for table, model in _seed_models().items()}
 
     now = datetime.now(UTC)
     roles = {name: Role(name=name, description=f"MineGuard {name.replace('_', ' ').title()} role") for name in ROLES}

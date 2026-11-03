@@ -13,11 +13,13 @@ export default function DocumentsPage() {
   const [documentType, setDocumentType] = useState(documentTypes[0])
   const [mineId, setMineId] = useState<number | null>(null)
   const [selected, setSelected] = useState<DocumentRecord | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const canVerify = ['ADMIN', 'MINE_MANAGER', 'SAFETY_OFFICER', 'AUDITOR'].includes(user?.role ?? '')
 
   async function load() {
+    setIsLoading(true)
     try {
       const [items, availableMines] = await Promise.all([listDocuments(), listMines()])
       setDocuments(items)
@@ -25,6 +27,8 @@ export default function DocumentsPage() {
       setError('')
     } catch {
       setError('Documents could not be loaded.')
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -33,6 +37,15 @@ export default function DocumentsPage() {
   async function submit() {
     if (!file) {
       setError('Select a document before uploading.')
+      return
+    }
+    const extension = file.name.split('.').pop()?.toLowerCase()
+    if (!['pdf', 'jpg', 'jpeg', 'png', 'txt'].includes(extension ?? '')) {
+      setError('Unsupported file type. Use PDF, JPG, PNG, or TXT.')
+      return
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setError('File exceeds the 10 MB limit.')
       return
     }
     setBusy(true)
@@ -66,6 +79,6 @@ export default function DocumentsPage() {
     <div className="module-heading"><div><p className="eyebrow accent">Evidence control / Phase 18</p><h2>Documents / OCR</h2><p>Upload certificates and evidence with clearly labelled DEMO OCR processing.</p></div><span className="demo-chip">OCR DEMO MODE</span></div>
     <section className="document-upload-panel"><div className="document-upload-heading"><UploadCloud size={22} /><div><h3>Upload document</h3><p>Accepted: PDF, JPG, PNG, or TXT. Maximum size: 10 MB.</p></div></div><div className="document-form-grid"><label>File<input type="file" accept=".pdf,.jpg,.jpeg,.png,.txt" onChange={(event) => setFile(event.target.files?.[0] ?? null)} /></label><label>Document type<select value={documentType} onChange={(event) => setDocumentType(event.target.value)}>{documentTypes.map((type) => <option key={type}>{type}</option>)}</select></label><label>Mine<select value={mineId ?? ''} onChange={(event) => setMineId(event.target.value ? Number(event.target.value) : null)}><option value="">Not linked</option>{mines.map((mine) => <option key={mine.id} value={mine.id}>{mine.mine_name}</option>)}</select></label></div><button className="primary-action" type="button" disabled={busy} onClick={() => void submit()}><UploadCloud size={16} />{busy ? 'Processing...' : 'Upload and run OCR'}</button></section>
     {error && <p className="module-error" role="alert">{error}</p>}
-    <div className="document-layout"><section className="document-list-panel"><div className="list-heading"><div><p className="eyebrow">Document register</p><h3>{documents.length} records</h3></div><span className="demo-chip">LIVE API</span></div>{documents.length === 0 ? <p className="inspection-empty">No documents uploaded yet.</p> : <div className="document-list">{documents.map((document) => <button type="button" className={selected?.id === document.id ? 'document-row selected' : 'document-row'} key={document.id} onClick={() => setSelected(document)}><FileSearch size={18} /><span><strong>{document.file_name}</strong><small>{document.document_type} / {document.mine_name ?? 'Unlinked'}</small></span><b>{document.status}</b></button>)}</div>}</section>{selected && <section className="document-detail-panel"><p className="eyebrow">OCR result / {selected.ocr_result?.verification_status ?? 'PENDING'}</p><h3>{selected.file_name}</h3><p>{selected.document_type} / {selected.mine_name ?? 'No mine linked'}</p><div className="document-confidence"><strong>{Math.round((selected.ocr_result?.confidence ?? 0) * 100)}%</strong><span>OCR confidence</span></div><h4>Detected fields</h4><pre>{selected.ocr_result?.detected_fields ?? '{}'} </pre><h4>Extracted text</h4><p className="ocr-text">{selected.ocr_result?.extracted_text ?? 'No OCR result available.'}</p>{canVerify && selected.status !== 'VERIFIED' && <div className="document-actions"><button className="primary-action" type="button" disabled={busy} onClick={() => void updateVerification(selected, 'VERIFIED')}><Check size={16} />Verify document</button><button type="button" disabled={busy} onClick={() => void updateVerification(selected, 'REJECTED')}>Reject</button></div>}</section>}</div>
+    <div className="document-layout"><section className="document-list-panel"><div className="list-heading"><div><p className="eyebrow">Document register</p><h3>{documents.length} records</h3></div><span className="demo-chip">LIVE API</span></div>{isLoading ? <p className="inspection-empty"><span className="module-loading" role="status">Loading documents…</span></p> : documents.length === 0 ? <p className="inspection-empty">No documents uploaded yet.</p> : <div className="document-list">{documents.map((document) => <button type="button" className={selected?.id === document.id ? 'document-row selected' : 'document-row'} key={document.id} onClick={() => setSelected(document)}><FileSearch size={18} /><span><strong>{document.file_name}</strong><small>{document.document_type} / {document.mine_name ?? 'Unlinked'}</small></span><b>{document.status}</b></button>)}</div>}</section>{selected && <section className="document-detail-panel"><p className="eyebrow">OCR result / {selected.ocr_result?.verification_status ?? 'PENDING'}</p><h3>{selected.file_name}</h3><p>{selected.document_type} / {selected.mine_name ?? 'No mine linked'}</p><div className="document-confidence"><strong>{Math.round((selected.ocr_result?.confidence ?? 0) * 100)}%</strong><span>OCR confidence</span></div><h4>Detected fields</h4><pre>{selected.ocr_result?.detected_fields ?? '{}'} </pre><h4>Extracted text</h4><p className="ocr-text">{selected.ocr_result?.extracted_text ?? 'No OCR result available.'}</p>{canVerify && selected.status !== 'VERIFIED' && <div className="document-actions"><button className="primary-action" type="button" disabled={busy} onClick={() => void updateVerification(selected, 'VERIFIED')}><Check size={16} />Verify document</button><button type="button" disabled={busy} onClick={() => void updateVerification(selected, 'REJECTED')}>Reject</button></div>}</section>}</div>
   </div>
 }

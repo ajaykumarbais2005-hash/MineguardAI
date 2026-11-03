@@ -1,5 +1,9 @@
-from fastapi import FastAPI
+import logging
+
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse, Response
+from starlette.middleware.base import RequestResponseEndpoint
 
 from app.config import get_settings
 from app.routers.auth import router as auth_router
@@ -22,6 +26,7 @@ from app.routers.reports import router as reports_router
 from app.routers.workflow import router as workflow_router
 
 settings = get_settings()
+logger = logging.getLogger(__name__)
 app = FastAPI(
     title="MineGuard AI API",
     description="Smart governance and compliance monitoring for coal mines.",
@@ -32,9 +37,30 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origin_list,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Accept", "Authorization", "Content-Type"],
 )
+
+
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next: RequestResponseEndpoint) -> Response:
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    if request.url.path not in {"/docs", "/redoc", "/openapi.json", "/docs/oauth2-redirect"}:
+        response.headers["Content-Security-Policy"] = "default-src 'none'; frame-ancestors 'none'; base-uri 'none'"
+    if settings.environment.lower() in {"production", "prod"} and request.url.scheme == "https":
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    return response
+
+
+@app.exception_handler(Exception)
+async def handle_unexpected_error(request: Request, exc: Exception) -> JSONResponse:
+    logger.error("Unhandled API error at %s (%s)", request.url.path, type(exc).__name__)
+    return JSONResponse(status_code=500, content={"detail": "Internal server error"})
+
+
 app.include_router(health_router)
 app.include_router(auth_router)
 app.include_router(compliance_router)

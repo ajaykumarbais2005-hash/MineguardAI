@@ -9,7 +9,7 @@ def test_admin_can_filter_audit_logs_and_read_summary(auth_client):
     assert len(logs.json()) == 1
     assert logs.json()[0]["entity"] == "SYSTEM"
     assert summary.status_code == 200
-    assert summary.json()["total"] == 1
+    assert summary.json()["total"] == 2
 
 
 def test_auditor_can_read_audit_trail(auth_client):

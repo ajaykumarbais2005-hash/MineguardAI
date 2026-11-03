@@ -1,6 +1,12 @@
 import axios from 'axios'
 
-export const AUTH_TOKEN_KEY = 'mineguard_access_token'
+export const AUTH_UNAUTHORIZED_EVENT = 'mineguard:unauthorized'
+
+let accessToken: string | null = null
+
+export function setAccessToken(token: string | null) {
+  accessToken = token
+}
 
 export const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL ?? 'http://127.0.0.1:8000',
@@ -8,12 +14,28 @@ export const api = axios.create({
 })
 
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem(AUTH_TOKEN_KEY)
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`
+  if (accessToken) {
+    config.headers.set('Authorization', `Bearer ${accessToken}`)
+  } else {
+    config.headers.delete('Authorization')
   }
   return config
 })
+
+api.interceptors.response.use(
+  (response) => response,
+  (error: unknown) => {
+    if (
+      axios.isAxiosError(error) &&
+      error.response?.status === 401 &&
+      !error.config?.url?.endsWith('/auth/login') &&
+      typeof window !== 'undefined'
+    ) {
+      window.dispatchEvent(new Event(AUTH_UNAUTHORIZED_EVENT))
+    }
+    return Promise.reject(error)
+  },
+)
 
 export type TokenResponse = {
   access_token: string
